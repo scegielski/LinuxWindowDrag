@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -9,8 +9,9 @@ internal static class NativeMethods
 {
     internal const int WmNcLButtonDown = 0x00A1;
     internal const int WmSysCommand = 0x0112;
-    private const int IdcArrow = 32512;
     private const int IdcHand = 32649;
+    private const uint OcrNormal = 32512;
+    private const uint SpiSetcursors = 0x0057;
 
     internal delegate IntPtr LowLevelMouseProc(int code, IntPtr wParam, IntPtr lParam);
     internal delegate IntPtr LowLevelKeyboardProc(int code, IntPtr wParam, IntPtr lParam);
@@ -130,22 +131,24 @@ internal static class NativeMethods
         keybd_event(VkControl, 0, KeyeventfKeyup, UIntPtr.Zero);
     }
 
-    internal static void SetHandCursor()
+    // Replace the system arrow cursor with the hand cursor so the change
+    // persists across WM_SETCURSOR resets from windows under the pointer.
+    internal static void SetSystemHandCursor()
     {
-        var cursor = LoadCursor(IntPtr.Zero, (IntPtr)IdcHand);
-        if (cursor != IntPtr.Zero)
+        var hand = LoadCursor(IntPtr.Zero, (IntPtr)IdcHand);
+        if (hand == IntPtr.Zero) return;
+        // SetSystemCursor takes ownership of its argument, so pass a copy.
+        var copy = CopyIcon(hand);
+        if (copy != IntPtr.Zero)
         {
-            _ = SetCursor(cursor);
+            SetSystemCursor(copy, OcrNormal);
         }
     }
 
-    internal static void SetArrowCursor()
+    // Restore all system cursors to their defaults.
+    internal static void RestoreSystemCursor()
     {
-        var cursor = LoadCursor(IntPtr.Zero, (IntPtr)IdcArrow);
-        if (cursor != IntPtr.Zero)
-        {
-            _ = SetCursor(cursor);
-        }
+        SystemParametersInfo(SpiSetcursors, 0, IntPtr.Zero, 0);
     }
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -169,8 +172,14 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr LoadCursor(IntPtr hInstance, IntPtr lpCursorName);
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr SetCursor(IntPtr hCursor);
+    [DllImport("user32.dll")]
+    private static extern bool SetSystemCursor(IntPtr hcur, uint id);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr CopyIcon(IntPtr hIcon);
+
+    [DllImport("user32.dll")]
+    private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, IntPtr pvParam, uint fWinIni);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern IntPtr GetModuleHandle(string? lpModuleName);

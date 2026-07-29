@@ -393,8 +393,6 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
                 return;
             }
 
-            ApplyActiveCursor();
-
             if (_dragMode == DragMode.Move)
             {
                 var newX = cursorPoint.X + _dragCursorOffset.X;
@@ -449,14 +447,14 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         _resizeCorner = ResizeCorner.TopLeft;
         _lastPollHeartbeatTick = 0;
         _dragPollTimer.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
-        NativeMethods.SetArrowCursor();
+        NativeMethods.RestoreSystemCursor();
     }
 
     private void ApplyActiveCursor()
     {
         if (_dragMode == DragMode.Move || _dragMode == DragMode.Resize)
         {
-            NativeMethods.SetHandCursor();
+            NativeMethods.SetSystemHandCursor();
         }
     }
 
