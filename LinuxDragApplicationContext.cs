@@ -211,6 +211,8 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         menu.Items.Add(_runAtStartupMenuItem);
         menu.Items.Add("Open Log Window", null, (_, _) => OpenLogWindow());
         menu.Items.Add("Open Log Folder", null, (_, _) => OpenLogFolder());
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("About", null, (_, _) => ShowAboutDialog());
         menu.Items.Add("Exit", null, (_, _) => ExitThread());
         UpdateModifierMenuChecks();
         UpdateRunAtStartupMenuCheck();
@@ -618,6 +620,16 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         _debugForm.WindowState = FormWindowState.Normal;
         _debugForm.BringToFront();
         _debugForm.Activate();
+    }
+
+    private void ShowAboutDialog()
+    {
+        var version = typeof(LinuxDragApplicationContext).Assembly.GetName().Version?.ToString() ?? "unknown";
+        MessageBox.Show(
+            $"Linux Window Drag{Environment.NewLine}Version {version}",
+            "About Linux Window Drag",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
     }
 
     private void UpdateRunAtStartupMenuCheck()
