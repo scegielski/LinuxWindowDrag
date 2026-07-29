@@ -14,6 +14,8 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
     private const int WmLButtonUp = 0x0202;
     private const int WmMButtonDown = 0x0207;
     private const int WmMButtonUp = 0x0208;
+    private const int WmRButtonDown = 0x0204;
+    private const int WmRButtonUp = 0x0205;
     private const int WmKeyDown = 0x0100;
     private const int WmKeyUp = 0x0101;
     private const int WmSysKeyDown = 0x0104;
@@ -33,6 +35,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
     private const string StartupRunValueName = "LinuxWindowDrag";
     private const string SettingsRegistryPath = @"Software\LinuxWindowDrag";
     private const string ModifierKeyValueName = "ModifierKey";
+    private const string ResizeButtonValueName = "ResizeButton";
 
     private enum DragMode
     {
@@ -54,6 +57,12 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         Alt,
         WindowsKey,
         Cntrl,
+    }
+
+    private enum ResizeButton
+    {
+        Middle,
+        Right,
     }
 
     // Static storage so hook stays alive for the lifetime of the app
@@ -82,9 +91,12 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
     private bool _suppressNextWinKeyUp;
     private long _lastPollHeartbeatTick;
     private ModifierKey _modifierKey = ModifierKey.Alt;
+    private ResizeButton _resizeButton = ResizeButton.Middle;
     private ToolStripMenuItem? _modifierAltMenuItem;
     private ToolStripMenuItem? _modifierWindowsMenuItem;
     private ToolStripMenuItem? _modifierCntrlMenuItem;
+    private ToolStripMenuItem? _resizeMiddleMenuItem;
+    private ToolStripMenuItem? _resizeRightMenuItem;
     private ToolStripMenuItem? _runAtStartupMenuItem;
     
     internal LinuxDragApplicationContext()
@@ -99,6 +111,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         _debugForm = new DebugForm();
         s_debugForm = _debugForm;
         LoadModifierKeyPreference();
+        LoadResizeButtonPreference();
 
         _debugForm.FormClosing += DebugForm_FormClosing;
 
@@ -210,6 +223,16 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         modifierMenu.DropDownItems.Add(_modifierCntrlMenuItem);
 
         menu.Items.Add(modifierMenu);
+
+        var resizeButtonMenu = new ToolStripMenuItem("Resize Button");
+        _resizeMiddleMenuItem = new ToolStripMenuItem("middle");
+        _resizeMiddleMenuItem.Click += (_, _) => SetResizeButton(ResizeButton.Middle);
+        resizeButtonMenu.DropDownItems.Add(_resizeMiddleMenuItem);
+        _resizeRightMenuItem = new ToolStripMenuItem("right");
+        _resizeRightMenuItem.Click += (_, _) => SetResizeButton(ResizeButton.Right);
+        resizeButtonMenu.DropDownItems.Add(_resizeRightMenuItem);
+        menu.Items.Add(resizeButtonMenu);
+
         menu.Items.Add(new ToolStripSeparator());
         _runAtStartupMenuItem = new ToolStripMenuItem("Run at Windows Startup");
         _runAtStartupMenuItem.Click += (_, _) => ToggleRunAtStartup();
@@ -220,6 +243,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         menu.Items.Add("About", null, (_, _) => ShowAboutDialog());
         menu.Items.Add("Exit", null, (_, _) => ExitThread());
         UpdateModifierMenuChecks();
+        UpdateResizeButtonMenuChecks();
         UpdateRunAtStartupMenuCheck();
         return menu;
     }
@@ -241,7 +265,9 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
             if (msgType != WmLButtonDown &&
                 msgType != WmLButtonUp &&
                 msgType != WmMButtonDown &&
-                msgType != WmMButtonUp)
+                msgType != WmMButtonUp &&
+                msgType != WmRButtonDown &&
+                msgType != WmRButtonUp)
             {
                 // Never swallow non-button messages; doing so can freeze cursor updates.
                 return NativeMethods.CallNextHookEx(s_mouseHook, code, wParam, lParam);
@@ -249,7 +275,10 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
 
             lock (_dragStateLock)
             {
-                if ((msgType == WmLButtonUp || msgType == WmMButtonUp) && _dragWindow != IntPtr.Zero)
+                var resizeDownMsg = _resizeButton == ResizeButton.Right ? WmRButtonDown : WmMButtonDown;
+                var resizeUpMsg = _resizeButton == ResizeButton.Right ? WmRButtonUp : WmMButtonUp;
+
+                if ((msgType == WmLButtonUp || msgType == resizeUpMsg) && _dragWindow != IntPtr.Zero)
                 {
                     var endedMode = _dragMode;
                     ResetDragState();
@@ -258,8 +287,8 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
                     return (IntPtr)1;
                 }
 
-                // Modifier+left or modifier+middle down starts action.
-                if (msgType == WmLButtonDown || msgType == WmMButtonDown)
+                // Modifier+left or modifier+resize-button down starts action.
+                if (msgType == WmLButtonDown || msgType == resizeDownMsg)
                 {
                     if (!modifierPressed)
                     {
@@ -291,7 +320,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
                             _dragMode = DragMode.Move;
                             _dragCursorOffset = new Point(rect.Left - cursorPoint.X, rect.Top - cursorPoint.Y);
                         }
-                        else
+                        else // resize button
                         {
                             _dragMode = DragMode.Resize;
                             InitializeResizeState(rect, cursorPoint);
@@ -454,11 +483,11 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
     {
         if (_dragMode == DragMode.Move)
         {
-            NativeMethods.SetSystemHandCursor();
+            NativeMethods.SetSystemResizeCursor();
         }
         else if (_dragMode == DragMode.Resize)
         {
-            NativeMethods.SetSystemResizeCursor();
+            NativeMethods.SetSystemHandCursor();
         }
     }
 
@@ -791,6 +820,100 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         if (_modifierCntrlMenuItem != null)
         {
             _modifierCntrlMenuItem.Checked = _modifierKey == ModifierKey.Cntrl;
+        }
+    }
+
+    private void SetResizeButton(ResizeButton button)
+    {
+        if (_resizeButton == button)
+        {
+            return;
+        }
+
+        lock (_dragStateLock)
+        {
+            _resizeButton = button;
+        }
+
+        try
+        {
+            SaveResizeButtonPreference();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log($"ERROR saving resize button setting: {ex.Message}");
+            MessageBox.Show("Unable to save resize button setting due to permissions.", "Linux Window Drag", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch (SecurityException ex)
+        {
+            Log($"ERROR saving resize button setting: {ex.Message}");
+            MessageBox.Show("Unable to save resize button setting due to permissions.", "Linux Window Drag", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Log($"ERROR saving resize button setting: {ex.Message}");
+            MessageBox.Show("Unable to save resize button setting.", "Linux Window Drag", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch (IOException ex)
+        {
+            Log($"ERROR saving resize button setting: {ex.Message}");
+            MessageBox.Show("Unable to save resize button setting.", "Linux Window Drag", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+
+        UpdateResizeButtonMenuChecks();
+        Log($"Resize button set to {button}");
+    }
+
+    private void LoadResizeButtonPreference()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(SettingsRegistryPath, false);
+            var configuredValue = key?.GetValue(ResizeButtonValueName) as string;
+            if (string.IsNullOrWhiteSpace(configuredValue))
+            {
+                return;
+            }
+
+            if (!Enum.TryParse<ResizeButton>(configuredValue, true, out var saved) || !Enum.IsDefined(saved))
+            {
+                Log($"Invalid saved resize button '{configuredValue}', using default {_resizeButton}.");
+                return;
+            }
+
+            _resizeButton = saved;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log($"ERROR reading resize button setting: {ex.Message}");
+        }
+        catch (SecurityException ex)
+        {
+            Log($"ERROR reading resize button setting: {ex.Message}");
+        }
+        catch (IOException ex)
+        {
+            Log($"ERROR reading resize button setting: {ex.Message}");
+        }
+    }
+
+    private void SaveResizeButtonPreference()
+    {
+        using var key = Registry.CurrentUser.CreateSubKey(SettingsRegistryPath, true)
+            ?? throw new InvalidOperationException("Unable to open resize button settings registry key.");
+        key.SetValue(ResizeButtonValueName, _resizeButton.ToString(), RegistryValueKind.String);
+    }
+
+    private void UpdateResizeButtonMenuChecks()
+    {
+        if (_resizeMiddleMenuItem != null)
+        {
+            _resizeMiddleMenuItem.Checked = _resizeButton == ResizeButton.Middle;
+        }
+
+        if (_resizeRightMenuItem != null)
+        {
+            _resizeRightMenuItem.Checked = _resizeButton == ResizeButton.Right;
         }
     }
 
