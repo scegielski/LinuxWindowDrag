@@ -1,0 +1,14 @@
+C:\Users\scegi\LinuxWindowDrag\bin\Debug\net9.0-windows\LinuxWindowDrag.exe
+C:\Users\scegi\LinuxWindowDrag\bin\Debug\net9.0-windows\LinuxWindowDrag.deps.json
+C:\Users\scegi\LinuxWindowDrag\bin\Debug\net9.0-windows\LinuxWindowDrag.runtimeconfig.json
+C:\Users\scegi\LinuxWindowDrag\bin\Debug\net9.0-windows\LinuxWindowDrag.dll
+C:\Users\scegi\LinuxWindowDrag\bin\Debug\net9.0-windows\LinuxWindowDrag.pdb
+C:\Users\scegi\LinuxWindowDrag\obj\Debug\net9.0-windows\LinuxWindowDrag.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\scegi\LinuxWindowDrag\obj\Debug\net9.0-windows\LinuxWindowDrag.AssemblyInfoInputs.cache
+C:\Users\scegi\LinuxWindowDrag\obj\Debug\net9.0-windows\LinuxWindowDrag.AssemblyInfo.cs
+C:\Users\scegi\LinuxWindowDrag\obj\Debug\net9.0-windows\LinuxWindowDrag.csproj.CoreCompileInputs.cache
+C:\Users\scegi\LinuxWindowDrag\obj\Debug\net9.0-windows\LinuxWindowDrag.dll
+C:\Users\scegi\LinuxWindowDrag\obj\Debug\net9.0-windows\refint\LinuxWindowDrag.dll
+C:\Users\scegi\LinuxWindowDrag\obj\Debug\net9.0-windows\LinuxWindowDrag.pdb
+C:\Users\scegi\LinuxWindowDrag\obj\Debug\net9.0-windows\LinuxWindowDrag.genruntimeconfig.cache
+C:\Users\scegi\LinuxWindowDrag\obj\Debug\net9.0-windows\ref\LinuxWindowDrag.dll
