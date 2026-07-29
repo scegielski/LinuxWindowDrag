@@ -5,3 +5,5 @@ obj\
 *.suo
 *.log
 TestResults\
+release/*.exe
+release/*.pdb

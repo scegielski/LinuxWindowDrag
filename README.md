@@ -4,6 +4,7 @@ Windows 10/11 tray app for Linux-style window manipulation:
 
 - **Modifier + left-drag**: move window
 - **Modifier + middle-drag**: resize from closest corner, anchored at opposite corner
+- Mouse cursor switches to a hand while move/resize is active
 
 The app ignores desktop/taskbar/tool windows.
 

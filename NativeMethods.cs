@@ -9,6 +9,8 @@ internal static class NativeMethods
 {
     internal const int WmNcLButtonDown = 0x00A1;
     internal const int WmSysCommand = 0x0112;
+    private const int IdcArrow = 32512;
+    private const int IdcHand = 32649;
 
     internal delegate IntPtr LowLevelMouseProc(int code, IntPtr wParam, IntPtr lParam);
     internal delegate IntPtr LowLevelKeyboardProc(int code, IntPtr wParam, IntPtr lParam);
@@ -128,6 +130,24 @@ internal static class NativeMethods
         keybd_event(VkControl, 0, KeyeventfKeyup, UIntPtr.Zero);
     }
 
+    internal static void SetHandCursor()
+    {
+        var cursor = LoadCursor(IntPtr.Zero, (IntPtr)IdcHand);
+        if (cursor != IntPtr.Zero)
+        {
+            _ = SetCursor(cursor);
+        }
+    }
+
+    internal static void SetArrowCursor()
+    {
+        var cursor = LoadCursor(IntPtr.Zero, (IntPtr)IdcArrow);
+        if (cursor != IntPtr.Zero)
+        {
+            _ = SetCursor(cursor);
+        }
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern bool UnhookWindowsHookEx(IntPtr hhk);
 
@@ -145,6 +165,12 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern void keybd_event(byte bVk, byte bScan, int dwFlags, UIntPtr dwExtraInfo);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr LoadCursor(IntPtr hInstance, IntPtr lpCursorName);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetCursor(IntPtr hCursor);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern IntPtr GetModuleHandle(string? lpModuleName);

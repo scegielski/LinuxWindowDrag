@@ -297,6 +297,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
                             InitializeResizeState(rect, cursorPoint);
                         }
 
+                        ApplyActiveCursor();
                         _dragPollTimer.Change(0, 8);
                         if (_dragMode == DragMode.Move)
                         {
@@ -392,6 +393,8 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
                 return;
             }
 
+            ApplyActiveCursor();
+
             if (_dragMode == DragMode.Move)
             {
                 var newX = cursorPoint.X + _dragCursorOffset.X;
@@ -446,6 +449,15 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         _resizeCorner = ResizeCorner.TopLeft;
         _lastPollHeartbeatTick = 0;
         _dragPollTimer.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+        NativeMethods.SetArrowCursor();
+    }
+
+    private void ApplyActiveCursor()
+    {
+        if (_dragMode == DragMode.Move || _dragMode == DragMode.Resize)
+        {
+            NativeMethods.SetHandCursor();
+        }
     }
 
     private void InitializeResizeState(NativeMethods.Rect rect, Point cursorPoint)
