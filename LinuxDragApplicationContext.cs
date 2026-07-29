@@ -78,7 +78,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
     private bool _ignoreMovesUntilNextDown;
     private bool _suppressNextWinKeyUp;
     private long _lastPollHeartbeatTick;
-    private ModifierKey _modifierKey = ModifierKey.WindowsKey;
+    private ModifierKey _modifierKey = ModifierKey.Alt;
     private ToolStripMenuItem? _modifierAltMenuItem;
     private ToolStripMenuItem? _modifierWindowsMenuItem;
     private ToolStripMenuItem? _modifierCntrlMenuItem;
@@ -121,6 +121,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
             System.Threading.Timeout.Infinite);
 
         Log("Application started. Left-drag moves, middle-drag resizes (with selected modifier).");
+        Log($"Current modifier key: {_modifierKey}");
         Log($"Log file: {_logPath}");
     }
 
