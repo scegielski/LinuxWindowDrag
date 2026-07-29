@@ -1,5 +1,0 @@
-C:\Users\scegi\LinuxWindowDrag\bin\Release\net9.0-windows\win-x64\publish\LinuxWindowDrag.exe
-C:\Users\scegi\LinuxWindowDrag\bin\Release\net9.0-windows\win-x64\publish\LinuxWindowDrag.dll
-C:\Users\scegi\LinuxWindowDrag\bin\Release\net9.0-windows\win-x64\publish\LinuxWindowDrag.deps.json
-C:\Users\scegi\LinuxWindowDrag\bin\Release\net9.0-windows\win-x64\publish\LinuxWindowDrag.runtimeconfig.json
-C:\Users\scegi\LinuxWindowDrag\bin\Release\net9.0-windows\win-x64\publish\LinuxWindowDrag.pdb
