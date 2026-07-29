@@ -452,9 +452,13 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
 
     private void ApplyActiveCursor()
     {
-        if (_dragMode == DragMode.Move || _dragMode == DragMode.Resize)
+        if (_dragMode == DragMode.Move)
         {
             NativeMethods.SetSystemHandCursor();
+        }
+        else if (_dragMode == DragMode.Resize)
+        {
+            NativeMethods.SetSystemResizeCursor();
         }
     }
 

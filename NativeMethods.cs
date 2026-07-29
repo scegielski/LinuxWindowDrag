@@ -10,6 +10,7 @@ internal static class NativeMethods
     internal const int WmNcLButtonDown = 0x00A1;
     internal const int WmSysCommand = 0x0112;
     private const int IdcHand = 32649;
+    private const int IdcSizeAll = 32646;
     private const uint OcrNormal = 32512;
     private const uint SpiSetcursors = 0x0057;
 
@@ -135,10 +136,21 @@ internal static class NativeMethods
     // persists across WM_SETCURSOR resets from windows under the pointer.
     internal static void SetSystemHandCursor()
     {
-        var hand = LoadCursor(IntPtr.Zero, (IntPtr)IdcHand);
-        if (hand == IntPtr.Zero) return;
+        ReplaceSystemArrow(IdcHand);
+    }
+
+    // Replace the system arrow cursor with the 4-directional resize cursor.
+    internal static void SetSystemResizeCursor()
+    {
+        ReplaceSystemArrow(IdcSizeAll);
+    }
+
+    private static void ReplaceSystemArrow(int idcCursor)
+    {
+        var cursor = LoadCursor(IntPtr.Zero, (IntPtr)idcCursor);
+        if (cursor == IntPtr.Zero) return;
         // SetSystemCursor takes ownership of its argument, so pass a copy.
-        var copy = CopyIcon(hand);
+        var copy = CopyIcon(cursor);
         if (copy != IntPtr.Zero)
         {
             SetSystemCursor(copy, OcrNormal);
