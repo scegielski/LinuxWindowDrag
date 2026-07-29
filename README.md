@@ -15,9 +15,11 @@ Right-click the tray icon:
   - `alt`
   - `windows key`
   - `cntrl`
+  - persists across restarts
 - **Run at Windows Startup** (toggle)
 - **Open Log Window**
 - **Open Log Folder**
+- **About** (shows version)
 - **Exit**
 
 ## Why this implementation looks the way it does
@@ -46,7 +48,7 @@ Several simpler approaches were attempted first and failed on real systems:
 - Mouse hook starts/stops action only.
 - A polling loop (`GetCursorPos`) drives movement/resizing at steady intervals.
 - Win-key Start-menu suppression is handled without leaving Win-key state stuck.
-- Modifier is user-selectable from tray menu.
+- Modifier is user-selectable from tray menu and saved in user settings.
 
 ## Build
 

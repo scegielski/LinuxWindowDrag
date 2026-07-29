@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Drawing;
 using Microsoft.Win32;
 using System.Runtime.InteropServices;
+using System.Security;
 
 namespace LinuxWindowDrag;
 
@@ -30,6 +31,8 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
     private const int ResizeMinHeight = 80;
     private const string StartupRunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string StartupRunValueName = "LinuxWindowDrag";
+    private const string SettingsRegistryPath = @"Software\LinuxWindowDrag";
+    private const string ModifierKeyValueName = "ModifierKey";
 
     private enum DragMode
     {
@@ -95,6 +98,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
 
         _debugForm = new DebugForm();
         s_debugForm = _debugForm;
+        LoadModifierKeyPreference();
 
         _debugForm.FormClosing += DebugForm_FormClosing;
 
@@ -690,8 +694,72 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
 
         _modifierKey = modifierKey;
         _suppressNextWinKeyUp = false;
+        try
+        {
+            SaveModifierKeyPreference();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log($"ERROR saving modifier key setting: {ex.Message}");
+            MessageBox.Show("Unable to save modifier key setting due to permissions.", "Linux Window Drag", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch (SecurityException ex)
+        {
+            Log($"ERROR saving modifier key setting: {ex.Message}");
+            MessageBox.Show("Unable to save modifier key setting due to permissions.", "Linux Window Drag", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Log($"ERROR saving modifier key setting: {ex.Message}");
+            MessageBox.Show("Unable to save modifier key setting.", "Linux Window Drag", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch (IOException ex)
+        {
+            Log($"ERROR saving modifier key setting: {ex.Message}");
+            MessageBox.Show("Unable to save modifier key setting.", "Linux Window Drag", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
         UpdateModifierMenuChecks();
         Log($"Modifier key set to {modifierKey}");
+    }
+
+    private void LoadModifierKeyPreference()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(SettingsRegistryPath, false);
+            var configuredValue = key?.GetValue(ModifierKeyValueName) as string;
+            if (string.IsNullOrWhiteSpace(configuredValue))
+            {
+                return;
+            }
+
+            if (!Enum.TryParse<ModifierKey>(configuredValue, true, out var savedModifier) || !Enum.IsDefined(savedModifier))
+            {
+                Log($"Invalid saved modifier key '{configuredValue}', using default {_modifierKey}.");
+                return;
+            }
+
+            _modifierKey = savedModifier;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log($"ERROR reading modifier key setting: {ex.Message}");
+        }
+        catch (SecurityException ex)
+        {
+            Log($"ERROR reading modifier key setting: {ex.Message}");
+        }
+        catch (IOException ex)
+        {
+            Log($"ERROR reading modifier key setting: {ex.Message}");
+        }
+    }
+
+    private void SaveModifierKeyPreference()
+    {
+        using var key = Registry.CurrentUser.CreateSubKey(SettingsRegistryPath, true)
+            ?? throw new InvalidOperationException("Unable to open modifier key settings registry key.");
+        key.SetValue(ModifierKeyValueName, _modifierKey.ToString(), RegistryValueKind.String);
     }
 
     private void UpdateModifierMenuChecks()
