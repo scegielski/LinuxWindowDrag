@@ -10,7 +10,11 @@ internal static class NativeMethods
     internal const int WmNcLButtonDown = 0x00A1;
     internal const int WmSysCommand = 0x0112;
     private const int IdcHand = 32649;
-    private const int IdcSizeAll = 32646;
+    internal const int IdcSizeAll = 32646;
+    internal const int IdcSizeNs = 32645;
+    internal const int IdcSizeWe = 32644;
+    internal const int IdcSizeNwse = 32642;
+    internal const int IdcSizeNesw = 32643;
     private const uint OcrNormal = 32512;
     private const uint SpiSetcursors = 0x0057;
 
@@ -132,17 +136,16 @@ internal static class NativeMethods
         keybd_event(VkControl, 0, KeyeventfKeyup, UIntPtr.Zero);
     }
 
-    // Replace the system arrow cursor with the hand cursor so the change
-    // persists across WM_SETCURSOR resets from windows under the pointer.
-    internal static void SetSystemHandCursor()
-    {
-        ReplaceSystemArrow(IdcHand);
-    }
-
-    // Replace the system arrow cursor with the 4-directional resize cursor.
-    internal static void SetSystemResizeCursor()
+    // Replace the system arrow cursor with the 4-directional move cursor (fleur).
+    internal static void SetSystemMoveCursor()
     {
         ReplaceSystemArrow(IdcSizeAll);
+    }
+
+    // Replace the system arrow cursor with a directional resize cursor for the given IDC constant.
+    internal static void SetSystemOctantResizeCursor(int idcCursor)
+    {
+        ReplaceSystemArrow(idcCursor);
     }
 
     private static void ReplaceSystemArrow(int idcCursor)
