@@ -52,6 +52,18 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         BottomRight,
     }
 
+    private enum ResizeHandle
+    {
+        TopLeft,
+        Top,
+        TopRight,
+        Right,
+        BottomRight,
+        Bottom,
+        BottomLeft,
+        Left,
+    }
+
     private enum ModifierKey
     {
         Alt,
@@ -86,8 +98,10 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
     private Point _dragCursorOffset = Point.Empty;
     private Point _resizeAnchor = Point.Empty;
     private Point _resizeCursorOffset = Point.Empty;
+    private Rectangle _resizeStartRect = Rectangle.Empty;
     private ResizeCorner _resizeCorner = ResizeCorner.TopLeft;
     private int _resizeOctantCursor = NativeMethods.IdcSizeAll;
+    private ResizeHandle _resizeHandle = ResizeHandle.TopLeft;
     private bool _ignoreMovesUntilNextDown;
     private bool _suppressNextWinKeyUp;
     private long _lastPollHeartbeatTick;
@@ -335,7 +349,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
                         }
                         else
                         {
-                            Log($"    ✓ Resize started window=0x{_dragWindow:X} cursor=({cursorPoint.X},{cursorPoint.Y}) rect=({rect.Left},{rect.Top},{rect.Right},{rect.Bottom}) corner={_resizeCorner} anchor=({_resizeAnchor.X},{_resizeAnchor.Y})");
+                            Log($"    ✓ Resize started window=0x{_dragWindow:X} cursor=({cursorPoint.X},{cursorPoint.Y}) rect=({rect.Left},{rect.Top},{rect.Right},{rect.Bottom}) handle={_resizeHandle} anchor=({_resizeAnchor.X},{_resizeAnchor.Y})");
                         }
                         return (IntPtr)1;
                     }
@@ -474,8 +488,10 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         _dragCursorOffset = Point.Empty;
         _resizeAnchor = Point.Empty;
         _resizeCursorOffset = Point.Empty;
+        _resizeStartRect = Rectangle.Empty;
         _resizeCorner = ResizeCorner.TopLeft;
         _resizeOctantCursor = NativeMethods.IdcSizeAll;
+        _resizeHandle = ResizeHandle.TopLeft;
         _lastPollHeartbeatTick = 0;
         _dragPollTimer.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
         NativeMethods.RestoreSystemCursor();
@@ -495,13 +511,77 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
 
     private void InitializeResizeState(NativeMethods.Rect rect, Point cursorPoint)
     {
+        _resizeStartRect = Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
+
         var topLeft = new Point(rect.Left, rect.Top);
         var topRight = new Point(rect.Right, rect.Top);
         var bottomLeft = new Point(rect.Left, rect.Bottom);
         var bottomRight = new Point(rect.Right, rect.Bottom);
 
+        var width = Math.Max(1, rect.Right - rect.Left);
+        var height = Math.Max(1, rect.Bottom - rect.Top);
+        var middleXStart = rect.Left + (width / 3);
+        var middleXEnd = rect.Right - (width / 3);
+        var middleYStart = rect.Top + (height / 3);
+        var middleYEnd = rect.Bottom - (height / 3);
+
+        var distTop = Math.Abs(cursorPoint.Y - rect.Top);
+        var distBottom = Math.Abs(cursorPoint.Y - rect.Bottom);
+        var distLeft = Math.Abs(cursorPoint.X - rect.Left);
+        var distRight = Math.Abs(cursorPoint.X - rect.Right);
+
+        var minEdgeDist = distTop;
+        _resizeHandle = ResizeHandle.Top;
+
+        if (distBottom < minEdgeDist)
+        {
+            minEdgeDist = distBottom;
+            _resizeHandle = ResizeHandle.Bottom;
+        }
+
+        if (distLeft < minEdgeDist)
+        {
+            minEdgeDist = distLeft;
+            _resizeHandle = ResizeHandle.Left;
+        }
+
+        if (distRight < minEdgeDist)
+        {
+            _resizeHandle = ResizeHandle.Right;
+        }
+
+        var inHorizontalMiddleThird = cursorPoint.X >= middleXStart && cursorPoint.X <= middleXEnd;
+        var inVerticalMiddleThird = cursorPoint.Y >= middleYStart && cursorPoint.Y <= middleYEnd;
+
+        if ((_resizeHandle is ResizeHandle.Top or ResizeHandle.Bottom) && inHorizontalMiddleThird)
+        {
+            var edgeX = Math.Clamp(cursorPoint.X, rect.Left, rect.Right);
+            var edgeY = _resizeHandle == ResizeHandle.Top ? rect.Top : rect.Bottom;
+            var closestEdgePoint = new Point(edgeX, edgeY);
+            _resizeCursorOffset = new Point(closestEdgePoint.X - cursorPoint.X, closestEdgePoint.Y - cursorPoint.Y);
+            _resizeAnchor = _resizeHandle == ResizeHandle.Top
+                ? new Point(edgeX, rect.Bottom)
+                : new Point(edgeX, rect.Top);
+            _resizeOctantCursor = NativeMethods.IdcSizeNs;
+            return;
+        }
+
+        if ((_resizeHandle is ResizeHandle.Left or ResizeHandle.Right) && inVerticalMiddleThird)
+        {
+            var edgeX = _resizeHandle == ResizeHandle.Left ? rect.Left : rect.Right;
+            var edgeY = Math.Clamp(cursorPoint.Y, rect.Top, rect.Bottom);
+            var closestEdgePoint = new Point(edgeX, edgeY);
+            _resizeCursorOffset = new Point(closestEdgePoint.X - cursorPoint.X, closestEdgePoint.Y - cursorPoint.Y);
+            _resizeAnchor = _resizeHandle == ResizeHandle.Left
+                ? new Point(rect.Right, edgeY)
+                : new Point(rect.Left, edgeY);
+            _resizeOctantCursor = NativeMethods.IdcSizeWe;
+            return;
+        }
+
         var closest = topLeft;
         _resizeCorner = ResizeCorner.TopLeft;
+        _resizeHandle = ResizeHandle.TopLeft;
         var minDist = DistanceSquared(cursorPoint, topLeft);
 
         var topRightDist = DistanceSquared(cursorPoint, topRight);
@@ -510,6 +590,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
             minDist = topRightDist;
             closest = topRight;
             _resizeCorner = ResizeCorner.TopRight;
+            _resizeHandle = ResizeHandle.TopRight;
         }
 
         var bottomLeftDist = DistanceSquared(cursorPoint, bottomLeft);
@@ -518,6 +599,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
             minDist = bottomLeftDist;
             closest = bottomLeft;
             _resizeCorner = ResizeCorner.BottomLeft;
+            _resizeHandle = ResizeHandle.BottomLeft;
         }
 
         var bottomRightDist = DistanceSquared(cursorPoint, bottomRight);
@@ -525,6 +607,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         {
             closest = bottomRight;
             _resizeCorner = ResizeCorner.BottomRight;
+            _resizeHandle = ResizeHandle.BottomRight;
         }
 
         _resizeCursorOffset = new Point(closest.X - cursorPoint.X, closest.Y - cursorPoint.Y);
@@ -571,11 +654,34 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
 
     private Rectangle BuildResizedRect(Point dragPoint)
     {
-        var left = Math.Min(dragPoint.X, _resizeAnchor.X);
-        var right = Math.Max(dragPoint.X, _resizeAnchor.X);
-        var top = Math.Min(dragPoint.Y, _resizeAnchor.Y);
-        var bottom = Math.Max(dragPoint.Y, _resizeAnchor.Y);
-        return Rectangle.FromLTRB(left, top, right, bottom);
+        return _resizeHandle switch
+        {
+            ResizeHandle.Top => Rectangle.FromLTRB(
+                _resizeStartRect.Left,
+                Math.Min(dragPoint.Y, _resizeAnchor.Y),
+                _resizeStartRect.Right,
+                Math.Max(dragPoint.Y, _resizeAnchor.Y)),
+            ResizeHandle.Bottom => Rectangle.FromLTRB(
+                _resizeStartRect.Left,
+                Math.Min(dragPoint.Y, _resizeAnchor.Y),
+                _resizeStartRect.Right,
+                Math.Max(dragPoint.Y, _resizeAnchor.Y)),
+            ResizeHandle.Left => Rectangle.FromLTRB(
+                Math.Min(dragPoint.X, _resizeAnchor.X),
+                _resizeStartRect.Top,
+                Math.Max(dragPoint.X, _resizeAnchor.X),
+                _resizeStartRect.Bottom),
+            ResizeHandle.Right => Rectangle.FromLTRB(
+                Math.Min(dragPoint.X, _resizeAnchor.X),
+                _resizeStartRect.Top,
+                Math.Max(dragPoint.X, _resizeAnchor.X),
+                _resizeStartRect.Bottom),
+            _ => Rectangle.FromLTRB(
+                Math.Min(dragPoint.X, _resizeAnchor.X),
+                Math.Min(dragPoint.Y, _resizeAnchor.Y),
+                Math.Max(dragPoint.X, _resizeAnchor.X),
+                Math.Max(dragPoint.Y, _resizeAnchor.Y)),
+        };
     }
 
     private static long DistanceSquared(Point a, Point b)
