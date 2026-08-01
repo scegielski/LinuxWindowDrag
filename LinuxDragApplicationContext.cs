@@ -87,6 +87,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
     private Point _resizeAnchor = Point.Empty;
     private Point _resizeCursorOffset = Point.Empty;
     private ResizeCorner _resizeCorner = ResizeCorner.TopLeft;
+    private int _resizeOctantCursor = NativeMethods.IdcSizeAll;
     private bool _ignoreMovesUntilNextDown;
     private bool _suppressNextWinKeyUp;
     private long _lastPollHeartbeatTick;
@@ -474,6 +475,7 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
         _resizeAnchor = Point.Empty;
         _resizeCursorOffset = Point.Empty;
         _resizeCorner = ResizeCorner.TopLeft;
+        _resizeOctantCursor = NativeMethods.IdcSizeAll;
         _lastPollHeartbeatTick = 0;
         _dragPollTimer.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
         NativeMethods.RestoreSystemCursor();
@@ -483,11 +485,11 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
     {
         if (_dragMode == DragMode.Move)
         {
-            NativeMethods.SetSystemResizeCursor();
+            NativeMethods.SetSystemMoveCursor();
         }
         else if (_dragMode == DragMode.Resize)
         {
-            NativeMethods.SetSystemHandCursor();
+            NativeMethods.SetSystemOctantResizeCursor(_resizeOctantCursor);
         }
     }
 
@@ -533,6 +535,37 @@ internal sealed class LinuxDragApplicationContext : ApplicationContext
             ResizeCorner.BottomLeft => topRight,
             ResizeCorner.BottomRight => topLeft,
             _ => bottomRight,
+        };
+        _resizeOctantCursor = ComputeOctantCursorId(rect, cursorPoint);
+    }
+
+    // Divides the window into 8 octants (45° each) from the window center and returns
+    // the matching Windows IDC resize cursor, mirroring Linux DE directional resize behavior.
+    private static int ComputeOctantCursorId(NativeMethods.Rect rect, Point cursor)
+    {
+        var cx = (rect.Left + rect.Right) / 2;
+        var cy = (rect.Top + rect.Bottom) / 2;
+        var dx = cursor.X - cx;
+        // Screen Y increases downward, so positive dy means the cursor is below center.
+        var dy = cursor.Y - cy;
+
+        // Atan2 returns angle in [-π, π]; normalize to [0°, 360°) with 0°=E, 90°=S, 180°=W, 270°=N.
+        var angleDeg = Math.Atan2(dy, dx) * (180.0 / Math.PI);
+        if (angleDeg < 0) angleDeg += 360.0;
+
+        // Map angle to one of 8 sectors (each 45° wide, sector 0 centered on E).
+        var sector = (int)((angleDeg + 22.5) / 45.0) % 8;
+        return sector switch
+        {
+            0 => NativeMethods.IdcSizeWe,    // E
+            1 => NativeMethods.IdcSizeNwse,  // SE
+            2 => NativeMethods.IdcSizeNs,    // S
+            3 => NativeMethods.IdcSizeNesw,  // SW
+            4 => NativeMethods.IdcSizeWe,    // W
+            5 => NativeMethods.IdcSizeNwse,  // NW
+            6 => NativeMethods.IdcSizeNs,    // N
+            7 => NativeMethods.IdcSizeNesw,  // NE
+            _ => NativeMethods.IdcSizeAll,
         };
     }
 
